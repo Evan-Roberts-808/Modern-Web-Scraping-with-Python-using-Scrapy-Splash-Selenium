@@ -1,5 +1,6 @@
 import scrapy
-
+import logging
+# use scrapy crawl spidername to run a spider
 
 class CountriesSpider(scrapy.Spider):
     name = "countries"
@@ -7,10 +8,26 @@ class CountriesSpider(scrapy.Spider):
     start_urls = ["https://www.worldometers.info/world-population/population-by-country"]
 
     def parse(self, response):
-        title = response.xpath("//h1/text()").get()
-        countries = response.xpath("//td/a/text()").getall()
+        # title = response.xpath("//h1/text()").get()
+        countries = response.xpath("//td/a")
+        for country in countries:
+            # When using an xpath expression against a variable and not response you must start with .//
+            name = country.xpath(".//text()").get()
+            link = country.xpath(".//@href").get()
+        # absolute_url = f"htts://www.worldometers.info{link}"
+        # absolute_url = response.urljoin(link)
+        # yield scrapy.Request(url=absolute_url)
+        yield response.follow(url=link, callback=self.parse_country, meta={'country_name': name})
 
-        yield {
-            'title': title,
-            'countries': countries
-        }
+    def parse_country(self, response):
+        name = response.request.meta['country_name']
+        logging.info(response.url)
+        rows = response.xpath("(//table[@class='table table-striped table-bordered table-hover table-condensed table-list])[1]/tbody/tr")
+        for row in rows:
+            year = row.xpath(".//td[1]/text()").get()
+            population = row.xpath(".//td[2]/strong/text()").get()
+            yield {
+                'country_name': name,
+                'year': year,
+                'population': population
+            }
